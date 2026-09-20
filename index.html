@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CampusSphere – AI Student Success &amp; Peer Study Hub</title>
+  <meta name="description" content="CampusSphere helps students summarize notes with AI, trade skills with peers, and track study time in one glassmorphic dashboard." />
+ 
+  <!-- Fonts (Google Fonts CDN) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet" />
+ 
+  <!-- Icons (FontAwesome CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+ 
+  <!-- Tailwind CSS (Play CDN – no build step) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Extend Tailwind with the CampusSphere font stacks
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+            display: ['Sora', '"DM Sans"', 'system-ui', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+ 
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+ 
+  <style>
+    /* ---------- Base ---------- */
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: #070b17;
+      color: #e2e8f0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-display { font-family: 'Sora', 'DM Sans', system-ui, sans-serif; letter-spacing: -0.02em; }
+ 
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: #070b17; }
+    ::-webkit-scrollbar-thumb { background: #27304d; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b4670; }
+ 
+    :focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+ 
+    /* ---------- Ambient background orbs ---------- */
+    .orb {
+      position: fixed; border-radius: 9999px; filter: blur(110px);
+      pointer-events: none; z-index: 0; animation: drift 22s ease-in-out infinite;
+    }
+    .orb-1 { width: 520px; height: 520px; top: -160px; left: -120px; background: #4f46e5; opacity: .32; }
+    .orb-2 { width: 460px; height: 460px; top: 35%; right: -160px; background: #7c3aed; opacity: .28; animation-delay: -8s; }
+    .orb-3 { width: 420px; height: 420px; bottom: -160px; left: 25%; background: #c026d3; opacity: .16; animation-delay: -14s; }
+    @keyframes drift {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      50% { transform: translate3d(40px, -34px, 0); }
+    }
+ 
+    /* ---------- Glass surfaces ---------- */
+    .glass {
+      background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.09);
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+      border-radius: 1.25rem;
+    }
+    .glow-hover { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+    .glow-hover:hover {
+      transform: translateY(-3px);
+      border-color: rgba(129,140,248,.6);
+      box-shadow: 0 0 0 1px rgba(129,140,248,.3), 0 14px 44px -12px rgba(99,102,241,.5);
+    }
+    .gradient-text {
+      background: linear-gradient(90deg, #a5b4fc, #c4b5fd, #f0abfc);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .icon-badge {
+      width: 2.6rem; height: 2.6rem; border-radius: .85rem;
+      display: grid; place-items: center; font-size: 1.05rem;
+    }
+ 
+    /* ---------- Buttons ---------- */
+    .btn-primary, .btn-ghost {
+      display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+      padding: .7rem 1.2rem; border-radius: .85rem; font-weight: 600; font-size: .9rem;
+      cursor: pointer; transition: transform .2s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease, opacity .2s ease;
+      white-space: nowrap;
+    }
+    .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6 60%, #a855f7); color: #fff; border: 1px solid rgba(255,255,255,.18); }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 28px rgba(139,92,246,.6); }
+    .btn-primary:active:not(:disabled) { transform: translateY(0); }
+    .btn-ghost { background: rgba(255,255,255,.05); color: #e2e8f0; border: 1px solid rgba(255,255,255,.12); }
+    .btn-ghost:hover:not(:disabled) { border-color: rgba(129,140,248,.7); background: rgba(99,102,241,.14); box-shadow: 0 0 18px rgba(99,102,241,.3); }
+    .btn-primary:disabled, .btn-ghost:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-sm { padding: .5rem .85rem; font-size: .8rem; border-radius: .7rem; }
+ 
+    /* ---------- Form controls ---------- */
+    .input {
+      width: 100%; background: rgba(8,12,28,.6); border: 1px solid rgba(255,255,255,.11);
+      border-radius: .8rem; padding: .7rem .95rem; color: #e2e8f0; font-size: .9rem;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .input::placeholder { color: #64748b; }
+    .input:focus { outline: none; border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99,102,241,.28); }
+    select.input option { background: #0f172a; color: #e2e8f0; }
+    .label { display: block; font-size: .8rem; font-weight: 600; color: #94a3b8; margin-bottom: .4rem; }
+ 
+    /* ---------- Chips & tags ---------- */
+    .chip {
+      display: inline-flex; align-items: center; gap: .45rem; padding: .4rem .85rem;
+      border-radius: 9999px; font-size: .8rem; font-weight: 600; cursor: pointer;
+      border: 1px solid rgba(255,255,255,.11); background: rgba(255,255,255,.04); color: #cbd5e1;
+      transition: all .2s ease;
+    }
+    .chip:hover { border-color: rgba(129,140,248,.65); color: #fff; }
+    .chip.active {
+      background: linear-gradient(135deg, rgba(99,102,241,.4), rgba(139,92,246,.4));
+      border-color: rgba(165,180,252,.8); color: #fff; box-shadow: 0 0 20px rgba(99,102,241,.4);
+    }
+    .chip:disabled { opacity: .45; cursor: not-allowed; }
+    .tag {
+      display: inline-flex; align-items: center; gap: .3rem; padding: .22rem .6rem; border-radius: .55rem;
+      font-size: .74rem; background: rgba(255,255,255,.06); color: #cbd5e1; border: 1px solid rgba(255,255,255,.07);
+    }
+    .tag-match { background: rgba(99,102,241,.2); color: #c7d2fe; border-color: rgba(129,140,248,.55); box-shadow: 0 0 14px rgba(99,102,241,.28); }
+    .tag-want { background: rgba(217,70,239,.12); color: #f5d0fe; border-color: rgba(217,70,239,.35); }
+ 
+    /* ---------- Nav ---------- */
+    .nav-link { padding: .5rem .9rem; border-radius: .7rem; font-size: .88rem; font-weight: 600; color: #94a3b8; transition: all .2s ease; }
+    .nav-link:hover { color: #fff; background: rgba(255,255,255,.06); }
+    .nav-link.active { color: #fff; background: rgba(99,102,241,.24); box-shadow: inset 0 0 0 1px rgba(129,140,248,.4); }
+ 
+    /* ---------- Trends ---------- */
+    .trend { display: inline-flex; align-items: center; gap: .3rem; font-size: .74rem; font-weight: 700; padding: .25rem .55rem; border-radius: 9999px; }
+    .trend-up { color: #34d399; background: rgba(52,211,153,.13); }
+    .trend-down { color: #fb7185; background: rgba(251,113,133,.13); }
+ 
+    /* ---------- Progress bars ---------- */
+    .bar-track { height: .6rem; border-radius: 9999px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .bar-fill {
+      height: 100%; border-radius: 9999px; width: 0;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6, #d946ef);
+      box-shadow: 0 0 14px rgba(139,92,246,.65);
+      transition: width .8s cubic-bezier(.2,.8,.2,1);
+    }
+ 
+    /* ---------- Summary output ---------- */
+    .bullet-dot { margin-top: .55rem; width: .5rem; height: .5rem; flex-shrink: 0; border-radius: 9999px; background: linear-gradient(135deg, #818cf8, #e879f9); box-shadow: 0 0 10px rgba(167,139,250,.9); }
+    .reveal-item { animation: rise .45s ease backwards; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .step-row { display: flex; align-items: center; gap: .75rem; font-size: .9rem; transition: color .3s ease; }
+    .step-pending { color: #64748b; }
+    .step-active { color: #e0e7ff; }
+    .step-done { color: #94a3b8; }
+ 
+    /* ---------- Match ring on peer cards ---------- */
+    .match-ring { width: 3.1rem; height: 3.1rem; border-radius: 9999px; display: grid; place-items: center; flex-shrink: 0; }
+    .match-ring span { width: 2.45rem; height: 2.45rem; border-radius: 9999px; background: #0c1226; display: grid; place-items: center; font-size: .72rem; font-weight: 700; color: #e0e7ff; }
+ 
+    /* ---------- Modals ---------- */
+    .modal {
+      position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center;
+      padding: 1rem; background: rgba(3,6,18,.74); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    .modal.is-open { display: flex; animation: fadeIn .2s ease; }
+    .modal-panel {
+      width: 100%; max-height: 90vh; overflow-y: auto; background: linear-gradient(160deg, #141b38, #0c1226);
+      border: 1px solid rgba(129,140,248,.35); border-radius: 1.4rem;
+      box-shadow: 0 0 60px -10px rgba(99,102,241,.55); animation: pop .28s cubic-bezier(.2,.9,.3,1.15);
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pop { from { opacity: 0; transform: scale(.94) translateY(12px); } to { opacity: 1; transform: none; } }
+ 
+    /* ---------- Toasts ---------- */
+    #toastRoot { position: fixed; right: 1rem; bottom: 1rem; z-index: 100; display: flex; flex-direction: column; gap: .6rem; max-width: calc(100vw - 2rem); }
+    .toast {
+      display: flex; align-items: center; gap: .7rem; padding: .8rem 1.05rem; border-radius: .95rem; font-size: .88rem;
+      background: rgba(15,23,42,.94); border: 1px solid rgba(255,255,255,.13); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      box-shadow: 0 12px 34px rgba(0,0,0,.45); animation: toastIn .3s ease backwards; transition: opacity .3s ease, transform .3s ease;
+    }
+    .toast-success i { color: #34d399; } .toast-info i { color: #818cf8; } .toast-error i { color: #fb7185; }
+    .toast-out { opacity: 0; transform: translateX(24px); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+ 
+    /* ---------- Focus timer ring ---------- */
+    #timerRing { transition: stroke-dashoffset .35s linear; }
+ 
+    /* ---------- Respect reduced motion ---------- */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+ 
+<body class="min-h-screen antialiased">
+  <!-- Ambient background -->
+  <div class="orb orb-1" aria-hidden="true"></div>
+  <div class="orb orb-2" aria-hidden="true"></div>
+  <div class="orb orb-3" aria-hidden="true"></div>
+ 
+  <!-- ===================== NAVIGATION ===================== -->
+  <header class="fixed inset-x-0 top-0 z-40 px-3">
+    <nav class="glass mx-auto mt-3 flex max-w-7xl items-center justify-between px-4 py-3" aria-label="Main navigation">
+      <a href="#dashboard" class="flex items-center gap-3">
+        <span class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 shadow-[0_0_22px_rgba(139,92,246,.6)]">
+          <i class="fa-solid fa-graduation-cap text-white"></i>
+        </span>
+        <span class="font-display text-lg font-bold">Campus<span class="gradient-text">Sphere</span></span>
+      </a>
+ 
+      <div class="hidden items-center gap-1 md:flex" id="desktopNav">
+        <a href="#dashboard" class="nav-link" data-section="dashboard">Dashboard</a>
+        <a href="#analytics" class="nav-link" data-section="analytics">Analytics</a>
+        <a href="#notes" class="nav-link" data-section="notes">AI Notes</a>
+        <a href="#peers" class="nav-link" data-section="peers">Peer Exchange</a>
+      </div>
+ 
+      <div class="flex items-center gap-3">
+        <button class="btn-primary btn-sm hidden sm:inline-flex" data-open-modal="logModal">
+          <i class="fa-solid fa-plus"></i> Log session
+        </button>
+        <span class="relative grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-sm font-bold" title="Alex Morgan">
+          AM
+          <span class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-900 bg-emerald-400"></span>
+        </span>
+        <button id="menuToggle" class="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/5 md:hidden" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobileMenu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </nav>
+ 
+    <div id="mobileMenu" class="glass mx-auto mt-2 hidden max-w-7xl flex-col gap-1 p-3 md:hidden">
+      <a href="#dashboard" class="nav-link" data-section="dashboard">Dashboard</a>
+      <a href="#analytics" class="nav-link" data-section="analytics">Analytics</a>
+      <a href="#notes" class="nav-link" data-section="notes">AI Notes</a>
+      <a href="#peers" class="nav-link" data-section="peers">Peer Exchange</a>
+      <button class="btn-primary mt-2" data-open-modal="logModal"><i class="fa-solid fa-plus"></i> Log session</button>
+    </div>
+  </header>
+ 
+  <main class="relative z-10 mx-auto max-w-7xl space-y-20 px-4 pb-16 pt-28">
+ 
+    <!-- ===================== DASHBOARD / HERO ===================== -->
+    <section id="dashboard" class="scroll-mt-28">
+      <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div class="max-w-2xl">
+          <h1 class="font-display text-4xl font-bold leading-tight md:text-5xl"><span id="greeting">Welcome back</span>, Alex.</h1>
+          <p class="mt-4 text-lg text-slate-400">Turn messy notes into clear summaries, find classmates who can teach what you need, and see exactly where your study hours go.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button class="btn-primary" data-open-modal="logModal"><i class="fa-solid fa-clock"></i> Log study session</button>
+          <a href="#notes" class="btn-ghost"><i class="fa-solid fa-wand-magic-sparkles"></i> Summarize notes</a>
+        </div>
+      </div>
+ 
+      <!-- Stat cards -->
+      <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="glass glow-hover p-5">
+          <div class="flex items-center justify-between">
+            <span class="icon-badge bg-indigo-500/15 text-indigo-300"><i class="fa-solid fa-clock"></i></span>
+            <span id="statHoursTrend" class="trend trend-up">+0% vs last week</span>
+          </div>
+          <p class="mt-4 text-sm text-slate-400">Study time this week</p>
+          <p class="font-display mt-1 text-3xl font-bold"><span id="statHours">0.0</span><span class="ml-1 text-lg font-medium text-slate-400">hours</span></p>
+        </div>
+ 
+        <div class="glass glow-hover p-5">
+          <div class="flex items-center justify-between">
+            <span class="icon-badge bg-violet-500/15 text-violet-300"><i class="fa-solid fa-bullseye"></i></span>
+          </div>
+          <p class="mt-4 text-sm text-slate-400">Weekly goal reached</p>
+          <p class="font-display mt-1 text-3xl font-bold"><span id="statGoal">0</span><span class="ml-0.5 text-lg font-medium text-slate-400">%</span></p>
+          <div class="bar-track mt-3"><div id="statGoalBar" class="bar-fill"></div></div>
+        </div>
+ 
+        <div class="glass glow-hover p-5">
+          <div class="flex items-center justify-between">
+            <span class="icon-badge bg-fuchsia-500/15 text-fuchsia-300"><i class="fa-solid fa-file-lines"></i></span>
+          </div>
+          <p class="mt-4 text-sm text-slate-400">Notes summarized</p>
+          <p class="font-display mt-1 text-3xl font-bold"><span id="statNotes">0</span></p>
+        </div>
+ 
+        <div class="glass glow-hover p-5">
+          <div class="flex items-center justify-between">
+            <span class="icon-badge bg-sky-500/15 text-sky-300"><i class="fa-solid fa-user-group"></i></span>
+          </div>
+          <p class="mt-4 text-sm text-slate-400">Peer connections</p>
+          <p class="font-display mt-1 text-3xl font-bold"><span id="statPeers">0</span></p>
+        </div>
+      </div>
+    </section>
+ 
+    <!-- ===================== ANALYTICS ===================== -->
+    <section id="analytics" class="scroll-mt-28">
+      <div class="mb-8">
+        <h2 class="font-display text-3xl font-bold">Study time analytics</h2>
+        <p class="mt-2 max-w-2xl text-slate-400">Every session you log or finish with the focus timer updates these charts and your stats instantly.</p>
+      </div>
+ 
+      <div class="grid gap-6 lg:grid-cols-3">
+        <!-- Trend chart -->
+        <div class="glass p-6 lg:col-span-2">
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="font-display text-lg font-semibold">Hours per day by subject</h3>
+              <p class="text-sm text-slate-400">Current week, Monday to Sunday</p>
+            </div>
+            <button class="btn-ghost btn-sm" data-open-modal="logModal"><i class="fa-solid fa-plus"></i> Add hours</button>
+          </div>
+          <div class="relative h-72"><canvas id="trendChart" aria-label="Stacked bar chart of study hours per day"></canvas></div>
+        </div>
+ 
+        <!-- Focus timer -->
+        <div class="glass p-6">
+          <h3 class="font-display text-lg font-semibold">Focus timer</h3>
+          <p class="text-sm text-slate-400">Finish a session to log it to the chart.</p>
+ 
+          <div class="mt-4">
+            <label class="label" for="timerSubject">Subject</label>
+            <select id="timerSubject" class="input"></select>
+          </div>
+ 
+          <div class="mt-4 flex flex-wrap gap-2" id="timerPresets">
+            <button class="chip" data-min="5">5 min</button>
+            <button class="chip active" data-min="25">25 min</button>
+            <button class="chip" data-min="45">45 min</button>
+            <button class="chip" data-min="60">60 min</button>
+          </div>
+ 
+          <div class="relative mx-auto mt-5 h-44 w-44">
+            <svg viewBox="0 0 160 160" class="h-full w-full -rotate-90" aria-hidden="true">
+              <defs>
+                <linearGradient id="timerGradient" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#6366f1" />
+                  <stop offset="55%" stop-color="#a855f7" />
+                  <stop offset="100%" stop-color="#e879f9" />
+                </linearGradient>
+              </defs>
+              <circle cx="80" cy="80" r="70" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="9" />
+              <circle id="timerRing" cx="80" cy="80" r="70" fill="none" stroke="url(#timerGradient)" stroke-width="9" stroke-linecap="round" style="filter: drop-shadow(0 0 8px rgba(168,85,247,.7));" />
+            </svg>
+            <div class="absolute inset-0 grid place-items-center text-center">
+              <div>
+                <p id="timerDisplay" class="font-display text-4xl font-bold tabular-nums">25:00</p>
+                <p id="timerStatus" class="mt-1 text-xs text-slate-400">Ready to focus</p>
+              </div>
+            </div>
+          </div>
+ 
+          <div class="mt-5 grid grid-cols-3 gap-2">
+            <button id="timerStart" class="btn-primary col-span-2"><i class="fa-solid fa-play"></i> Start</button>
+            <button id="timerReset" class="btn-ghost" aria-label="Reset timer"><i class="fa-solid fa-rotate-left"></i></button>
+            <button id="timerFinish" class="btn-ghost col-span-3"><i class="fa-solid fa-flag-checkered"></i> Finish and log session</button>
+          </div>
+        </div>
+      </div>
+ 
+      <div class="mt-6 grid gap-6 md:grid-cols-3">
+        <!-- Subject split -->
+        <div class="glass p-6">
+          <h3 class="font-display text-lg font-semibold">Subject split</h3>
+          <p class="mb-3 text-sm text-slate-400">Where this week's hours went</p>
+          <div class="relative h-56"><canvas id="subjectChart" aria-label="Doughnut chart of hours per subject"></canvas></div>
+        </div>
+ 
+        <!-- Goal & insights -->
+        <div class="glass p-6">
+          <h3 class="font-display text-lg font-semibold">Weekly goal</h3>
+          <p class="text-sm text-slate-400">Target: <span id="goalTarget">30</span> hours</p>
+          <div class="bar-track mt-5"><div id="goalBar" class="bar-fill"></div></div>
+          <p id="goalText" class="mt-3 text-sm font-semibold text-slate-200">0 of 30 hours</p>
+          <p id="goalHint" class="mt-1 text-sm text-slate-400"></p>
+ 
+          <dl class="mt-6 space-y-3 text-sm">
+            <div class="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
+              <dt class="text-slate-400"><i class="fa-solid fa-fire mr-2 text-amber-400"></i>Best day</dt>
+              <dd id="insightBestDay" class="font-semibold">–</dd>
+            </div>
+            <div class="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
+              <dt class="text-slate-400"><i class="fa-solid fa-book-open mr-2 text-indigo-300"></i>Top subject</dt>
+              <dd id="insightTopSubject" class="font-semibold">–</dd>
+            </div>
+            <div class="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
+              <dt class="text-slate-400"><i class="fa-solid fa-chart-line mr-2 text-emerald-300"></i>Daily average</dt>
+              <dd id="insightAvg" class="font-semibold">–</dd>
+            </div>
+          </dl>
+        </div>
+ 
+        <!-- Activity feed -->
+        <div class="glass p-6">
+          <h3 class="font-display text-lg font-semibold">Recent activity</h3>
+          <p class="mb-4 text-sm text-slate-400">Your latest actions in CampusSphere</p>
+          <ul id="activityList" class="space-y-3"></ul>
+        </div>
+      </div>
+    </section>
+ 
+    <!-- ===================== AI NOTES SUMMARIZER ===================== -->
+    <section id="notes" class="scroll-mt-28">
+      <div class="mb-8">
+        <h2 class="font-display text-3xl font-bold">AI notes summarizer</h2>
+        <p class="mt-2 max-w-2xl text-slate-400">Paste lecture notes and get the key points, main concepts, and self-test questions. The summarizer runs in your browser, so your notes never leave this page.</p>
+      </div>
+ 
+      <div class="grid gap-6 lg:grid-cols-2">
+        <!-- Input -->
+        <div class="glass p-6">
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h3 class="font-display text-lg font-semibold">Your notes</h3>
+            <div class="flex gap-2">
+              <button id="sampleBtn" class="btn-ghost btn-sm"><i class="fa-solid fa-lightbulb"></i> Use sample notes</button>
+              <button id="clearNotesBtn" class="btn-ghost btn-sm" aria-label="Clear notes"><i class="fa-solid fa-eraser"></i></button>
+            </div>
+          </div>
+ 
+          <label class="sr-only" for="notesInput">Paste your notes</label>
+          <textarea id="notesInput" rows="12" class="input resize-none leading-relaxed" placeholder="Paste at least 40 words of lecture notes, a textbook section, or an article here..."></textarea>
+          <div class="mt-2 flex justify-between text-xs text-slate-400">
+            <span id="wordCount">0 words</span>
+            <span>Minimum 40 words</span>
+          </div>
+ 
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="label" for="summaryLength">Summary length</label>
+              <select id="summaryLength" class="input">
+                <option value="brief">Brief (2 key points)</option>
+                <option value="standard" selected>Standard (4 key points)</option>
+                <option value="detailed">Detailed (6 key points)</option>
+              </select>
+            </div>
+            <div>
+              <label class="label" for="summaryFormat">Format</label>
+              <select id="summaryFormat" class="input">
+                <option value="bullets" selected>Bullet points</option>
+                <option value="paragraph">Paragraph</option>
+              </select>
+            </div>
+          </div>
+ 
+          <button id="generateBtn" class="btn-primary mt-5 w-full py-3"><i class="fa-solid fa-wand-magic-sparkles"></i> Generate summary</button>
+        </div>
+ 
+        <!-- Output -->
+        <div class="glass flex min-h-[30rem] flex-col p-6">
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h3 class="font-display text-lg font-semibold">AI summary</h3>
+            <div class="flex gap-2">
+              <button id="copyBtn" class="btn-ghost btn-sm" disabled><i class="fa-solid fa-copy"></i> Copy</button>
+              <button id="saveBtn" class="btn-ghost btn-sm" disabled><i class="fa-solid fa-bookmark"></i> Save</button>
+              <button id="libraryBtn" class="btn-ghost btn-sm" data-open-modal="libraryModal"><i class="fa-solid fa-book-bookmark"></i> Library <span id="libraryCount" class="rounded-full bg-indigo-500/30 px-1.5 text-xs">0</span></button>
+            </div>
+          </div>
+ 
+          <!-- Empty state -->
+          <div id="summaryEmpty" class="grid flex-1 place-items-center text-center">
+            <div class="max-w-xs">
+              <span class="icon-badge mx-auto bg-indigo-500/15 text-indigo-300"><i class="fa-solid fa-brain"></i></span>
+              <p class="mt-4 font-semibold">Your summary will appear here</p>
+              <p class="mt-1 text-sm text-slate-400">Paste notes on the left, or load the sample notes to see how it works.</p>
+            </div>
+          </div>
+ 
+          <!-- Loading state -->
+          <div id="summaryLoading" class="flex hidden flex-1 flex-col justify-center">
+            <ul id="loadingSteps" class="space-y-4"></ul>
+            <div class="bar-track mt-6"><div id="loadingBar" class="bar-fill"></div></div>
+          </div>
+ 
+          <!-- Result state -->
+          <div id="summaryResult" class="hidden flex-1">
+            <div id="summaryStats" class="mb-5 flex flex-wrap gap-2"></div>
+            <div id="summaryBody" class="leading-relaxed text-slate-200"></div>
+ 
+            <h4 class="font-display mt-6 text-sm font-semibold text-slate-300">Key concepts</h4>
+            <div id="keywordList" class="mt-2 flex flex-wrap gap-2"></div>
+ 
+            <h4 class="font-display mt-6 text-sm font-semibold text-slate-300">Test yourself</h4>
+            <ul id="questionList" class="mt-2 space-y-2 text-sm text-slate-300"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+ 
+    <!-- ===================== PEER SKILL EXCHANGE ===================== -->
+    <section id="peers" class="scroll-mt-28">
+      <div class="mb-8">
+        <h2 class="font-display text-3xl font-bold">Peer skill exchange</h2>
+        <p class="mt-2 max-w-2xl text-slate-400">Trade what you know for what you need. Bolt icons mark skills that match your goals, and the match score rises when you can help each other.</p>
+      </div>
+ 
+      <div class="glass mb-6 p-5">
+        <div class="grid gap-3 md:grid-cols-[1fr_13rem_auto]">
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+            <label class="sr-only" for="peerSearch">Search peers</label>
+            <input id="peerSearch" type="search" class="input pl-11" placeholder="Search by name, skill, or major" autocomplete="off" />
+          </div>
+          <div>
+            <label class="sr-only" for="peerSort">Sort peers</label>
+            <select id="peerSort" class="input">
+              <option value="match">Best match</option>
+              <option value="rating">Top rated</option>
+              <option value="sessions">Most sessions</option>
+            </select>
+          </div>
+          <button id="availableToggle" class="chip justify-center py-3" role="switch" aria-checked="false">
+            <i class="fa-solid fa-circle text-[.5rem] text-emerald-400"></i> Available now
+          </button>
+        </div>
+ 
+        <div id="categoryChips" class="mt-4 flex flex-wrap gap-2"></div>
+ 
+        <p id="myProfileLine" class="mt-4 text-sm text-slate-400"></p>
+      </div>
+ 
+      <p id="peerCount" class="mb-4 text-sm text-slate-400"></p>
+      <div id="peerGrid" class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3"></div>
+ 
+      <div id="peerEmpty" class="glass hidden p-10 text-center">
+        <span class="icon-badge mx-auto bg-slate-500/15 text-slate-300"><i class="fa-solid fa-user-slash"></i></span>
+        <p class="mt-4 font-semibold">No peers match these filters</p>
+        <p class="mt-1 text-sm text-slate-400">Try a different skill, or turn off the availability filter.</p>
+        <button id="clearFilters" class="btn-primary btn-sm mt-5">Clear filters</button>
+      </div>
+    </section>
+  </main>
+ 
+  <footer class="relative z-10 border-t border-white/10 px-4 py-8">
+    <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-sm text-slate-400 sm:flex-row">
+      <p>CampusSphere is a student hackathon project for Open Innovation &amp; Education.</p>
+      <button id="resetBtn" class="btn-ghost btn-sm"><i class="fa-solid fa-rotate"></i> Reset demo data</button>
+    </div>
+  </footer>
+ 
+  <!-- ===================== MODALS ===================== -->
+ 
+  <!-- Log study session -->
+  <div id="logModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <div class="modal-panel max-w-md p-6">
+      <div class="mb-5 flex items-start justify-between">
+        <div>
+          <h3 id="logTitle" class="font-display text-xl font-bold">Log a study session</h3>
+          <p class="text-sm text-slate-400">Charts and stats update as soon as you save.</p>
+        </div>
+        <button class="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10" data-close-modal aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="logForm" class="space-y-4" novalidate>
+        <div>
+          <label class="label" for="logSubject">Subject</label>
+          <select id="logSubject" class="input"></select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="label" for="logDay">Day</label>
+            <select id="logDay" class="input"></select>
+          </div>
+          <div>
+            <label class="label" for="logHours">Hours</label>
+            <input id="logHours" class="input" type="number" min="0.25" max="12" step="0.25" value="1" />
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2" id="logQuick">
+          <button type="button" class="chip" data-hours="0.5">30 min</button>
+          <button type="button" class="chip" data-hours="1">1 h</button>
+          <button type="button" class="chip" data-hours="1.5">1.5 h</button>
+          <button type="button" class="chip" data-hours="2">2 h</button>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" class="btn-ghost" data-close-modal>Cancel</button>
+          <button type="submit" class="btn-primary"><i class="fa-solid fa-check"></i> Save session</button>
+        </div>
+      </form>
+    </div>
+  </div>
+ 
+  <!-- Connect with a peer -->
+  <div id="connectModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="connectTitle">
+    <div class="modal-panel max-w-lg p-6">
+      <div class="mb-5 flex items-start justify-between">
+        <div class="flex items-center gap-3">
+          <span id="connectAvatar" class="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 font-bold">?</span>
+          <div>
+            <h3 id="connectTitle" class="font-display text-xl font-bold">Request a session</h3>
+            <p id="connectPeerMeta" class="text-sm text-slate-400"></p>
+          </div>
+        </div>
+        <button class="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10" data-close-modal aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="connectForm" class="space-y-4" novalidate>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="label" for="connectSkill">Skill you want to learn</label>
+            <select id="connectSkill" class="input"></select>
+          </div>
+          <div>
+            <label class="label" for="connectSlot">Preferred time</label>
+            <select id="connectSlot" class="input"></select>
+          </div>
+        </div>
+        <div>
+          <label class="label" for="connectMessage">Message</label>
+          <textarea id="connectMessage" rows="4" class="input resize-none"></textarea>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" class="btn-ghost" data-close-modal>Cancel</button>
+          <button type="submit" class="btn-primary"><i class="fa-solid fa-paper-plane"></i> Send request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+ 
+  <!-- Peer profile -->
+  <div id="profileModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+    <div class="modal-panel max-w-lg p-6">
+      <div class="mb-2 flex justify-end">
+        <button class="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10" data-close-modal aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="profileBody"></div>
+    </div>
+  </div>
+ 
+  <!-- Saved summaries library -->
+  <div id="libraryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="libraryTitle">
+    <div class="modal-panel max-w-2xl p-6">
+      <div class="mb-5 flex items-start justify-between">
+        <div>
+          <h3 id="libraryTitle" class="font-display text-xl font-bold">Saved summaries</h3>
+          <p class="text-sm text-slate-400">Revisit and copy your saved study notes.</p>
+        </div>
+        <button class="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10" data-close-modal aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="libraryList" class="space-y-4"></div>
+    </div>
+  </div>
+ 
+  <!-- Toast notifications -->
+  <div id="toastRoot" aria-live="polite"></div>
+ 
+  <script src="script.js"></script>
+</body>
+</html>
+ 
